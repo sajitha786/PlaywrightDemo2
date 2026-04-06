@@ -2,7 +2,6 @@ import { test, expect } from '@playwright/test';
 import { loginCreds, url } from '../test-data/loginCreds';
 
 test.describe.only('Login Tests', () => {
-
     for (const creds of loginCreds) {
         test(`Login with valid & invalid credentials with username ${creds.username} and password ${creds.password}`, async ({ page }) => {
             //let url = "https://www.saucedemo.com/";
