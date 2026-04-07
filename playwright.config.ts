@@ -44,6 +44,17 @@ export default defineConfig({
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
     },
+    {
+      name: 'Login',
+      testMatch: 'login.spec.ts',
+      use: { ...devices['Desktop Chrome'] },
+    },
+    {
+      name: 'Inventory',
+      testMatch: 'inventory.spec.ts',
+      use: { ...devices['Desktop Chrome'] },
+      //dependencies: ['Login'] -- commenting it as the global setup is done for valid login
+    }
 
     /*{
       name: 'firefox',
