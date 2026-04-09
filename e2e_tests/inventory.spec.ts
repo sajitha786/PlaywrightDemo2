@@ -1,78 +1,59 @@
 import { test, expect } from '@playwright/test';
+import { addProductList, removeProductList } from '../test-data/products';
+import { sorting, pageEndpoints } from '../config/constants';
+import { Inventory } from '../pages/inventoryPage';
 
 test.describe('Inventory Feature', async () => {
-    test('Sort products by price (low to high)', async ({ page }) => {
-        // let username = loginCreds[0].username;
-        // let password = loginCreds[0].password;
-        // await page.goto('');
-        // await page.getByRole('textbox', { name: 'username' }).fill(username);
-        // await page.getByRole('textbox', { name: 'password' }).fill(password);
-        // await page.click("#login-button");
-        // await expect(page).toHaveURL("https://www.saucedemo.com/inventory.html");
-        // await expect(page.getByText("Products")).toBeVisible();
-        // await page.click(".product_sort_container");
-        //await page.pause();
-        await page.goto("/inventory.html");
-        await page.selectOption('.product_sort_container', 'Price (high to low)');
-        let prices = await page.locator('div.inventory_item_price').allInnerTexts();
-        console.log("Prices before looping", prices);
-        const numericPrices = prices.map(price => parseFloat(price.replace("$", "")));
-        console.log(numericPrices);
-        let sortedPrices = [...numericPrices].sort((a, b) => b - a);
-        console.log(sortedPrices);
-        expect(numericPrices).toEqual(sortedPrices);
+    test.beforeEach(async ({ page }) => {
+        await page.goto(pageEndpoints.INVENTORY);
+    })
+    test.only('Sort products by price (low to high)', async ({ page }) => {
+        const inventory = new Inventory(page)
+        let actualPrices = await (await inventory
+            .selectSortingType(sorting.LOW_TO_HIGH))
+            .getProductPrice();
+        let expectedPrices = await inventory.performSorting(sorting.LOW_TO_HIGH, actualPrices)
+        expect(actualPrices).toEqual(expectedPrices);
     })
 
 
     test('Add a product to the cart', async ({ page }) => {
         // add product to cart actions here
-        let productList = ['Sauce Labs Backpack', 'Sauce Labs Fleece Jacket', 'Test.allTheThings() T-Shirt (Red)']
-        await page.goto('/inventory.html');
-        for (let product of productList) {
+        for (let product of addProductList) {
             await page.getByText(product).click();
             await page.locator('[data-test="add-to-cart"]').click();
             await page.getByRole("button", { name: 'Go back Back to products' }).click();
         }
         const cartBadge = page.locator('[data-test="shopping-cart-badge"]');
-        await expect(cartBadge).toHaveText(String(productList.length));
+        await expect(cartBadge).toHaveText(String(addProductList.length));
 
         await cartBadge.click();
         let allProductNames = await page.locator('[data-test="inventory-item-name"]').allInnerTexts();
-        expect(allProductNames, "Count of products in cart is not equal").toHaveLength(productList.length)
-        expect(allProductNames, "Products in cart are not equal").toEqual(productList)
+        expect(allProductNames, "Count of products in cart is not equal").toHaveLength(addProductList.length)
+        expect(allProductNames, "Products in cart are not equal").toEqual(addProductList)
     })
 
     test('Remove a product from the cart', async ({ page }) => {
-        await page.goto("/inventory.html")
-        let addProductList = ['Sauce Labs Backpack', 'Sauce Labs Fleece Jacket', 'Test.allTheThings() T-Shirt (Red)']
-        await page.goto('/inventory.html');
         for (const product of addProductList) {
             await page.getByText(product).click();
             await page.locator('[data-test="add-to-cart"]').click();
             await page.getByRole("button", { name: 'Go back Back to products' }).click();
         }
         await page.locator('[data-test="shopping-cart-badge"]').click();
-        let removeProductList = ['Sauce Labs Backpack', 'Sauce Labs Fleece Jacket']
         let removeButton = "";
         for (const product of removeProductList) {
-            console.log("product", product)
             removeButton = product.replace(/\s+/g, "-");
             removeButton = removeButton.toLocaleLowerCase();
-            console.log(removeButton)
             await page.locator(`[data-test="remove-${removeButton}"]`).click();
         }
 
         //await page.locator('[data-test="remove-sauce-labs-fleece-jacket"]').click();
         const totalItem = await page.locator('.inventory_item_name').allInnerTexts();
-        console.log(await page.locator('.inventory_item_name').count());;
-        console.log(totalItem);
+        console.log(await page.locator('.inventory_item_name').count());
         expect(totalItem).not.toContain(removeProductList[1]);
     })
     test('Checkout the product from the cart', async ({ page }) => {
-        await page.goto("/inventory.html")
-        let productList = ['Sauce Labs Backpack', 'Sauce Labs Fleece Jacket', 'Test.allTheThings() T-Shirt (Red)']
-        await page.goto('/inventory.html');
-        for (const product of productList) {
+        for (const product of addProductList) {
             await page.getByText(product).click();
             await page.locator('[data-test="add-to-cart"]').click();
             await page.getByRole("button", { name: 'Go back Back to products' }).click();
@@ -84,8 +65,8 @@ test.describe('Inventory Feature', async () => {
         await page.getByRole("textbox", { name: 'Zip/Postal Code' }).fill('1234');
         await page.locator('[data-test="continue"]').click();
         const checkoutItems = await page.locator("div.inventory_item_name").allInnerTexts();
-        expect(checkoutItems, "Count of products in cart is not equal").toHaveLength(productList.length)
-        expect(checkoutItems, "Products in cart are not equal").toEqual(productList)
+        expect(checkoutItems, "Count of products in cart is not equal").toHaveLength(addProductList.length)
+        expect(checkoutItems, "Products in cart are not equal").toEqual(addProductList)
         expect(page.locator('[data-test="payment-info-label"]')).toBeVisible();
         expect(page.locator('[data-test="payment-info-value"]').first()).toBeVisible();
         await page.locator('#finish').click();
@@ -93,18 +74,15 @@ test.describe('Inventory Feature', async () => {
         await page.locator('[data-test="back-to-products"]').click();
     })
 
-    test.only('Logout Feature', async ({ page }) => {
-        await page.goto("/inventory.html")
-        let productList = ['Sauce Labs Backpack', 'Sauce Labs Fleece Jacket', 'Test.allTheThings() T-Shirt (Red)']
-        await page.goto('/inventory.html');
-        for (const product of productList) {
+    test('Logout Feature', async ({ page }) => {
+        for (const product of addProductList) {
             await page.getByText(product).click();
             await page.locator('[data-test="add-to-cart"]').click();
             await page.getByRole("button", { name: 'Go back Back to products' }).click();
         }
         await page.locator('[data-test="shopping-cart-badge"]').click();
-        await page.getByRole('button', { name: 'Open Menu'}).click();
+        await page.getByRole('button', { name: 'Open Menu' }).click();
         await page.locator("a#logout_sidebar_link").click();
-        await expect (page.locator('div.login_logo')).toBeVisible();
+        await expect(page.locator('div.login_logo')).toBeVisible();
     })
 })
