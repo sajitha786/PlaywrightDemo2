@@ -1,5 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
-
+import {ENV} from './config/env';
 /**
  * Read environment variables from file.
  * https://github.com/motdotla/dotenv
@@ -27,7 +27,7 @@ export default defineConfig({
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     storageState: 'state.json',
-    baseURL:"https://www.saucedemo.com/",
+    baseURL:ENV.BASE_URL,
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
     headless:false,
