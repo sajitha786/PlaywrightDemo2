@@ -2,12 +2,18 @@ import { test, expect } from '@playwright/test';
 import { addProductList, removeProductList } from '../test-data/products';
 import { sorting, pageEndpoints } from '../config/constants';
 import { Inventory } from '../pages/inventoryPage';
+import { Cart } from '../pages/cartPage';
+import { Checkout } from '../pages/checkoutPage';
+import { checkoutCreds } from '../test-data/checkoutCreds';
+import { CheckoutOverview } from '../pages/checkoutOverviewPage';
+import { Order } from '../pages/orderConfirmationPage';
+import { LBL_LOGIN_LOGO } from '../objects/loginObjects';
 
 test.describe('Inventory Feature', async () => {
     test.beforeEach(async ({ page }) => {
         await page.goto(pageEndpoints.INVENTORY);
     })
-    test.only('Sort products by price (low to high)', async ({ page }) => {
+    test('Sort products by price (low to high)', async ({ page }) => {
         const inventory = new Inventory(page)
         let actualPrices = await (await inventory
             .selectSortingType(sorting.LOW_TO_HIGH))
@@ -18,71 +24,90 @@ test.describe('Inventory Feature', async () => {
 
 
     test('Add a product to the cart', async ({ page }) => {
+        const inventory = new Inventory(page)
+        const cart = new Cart(page)
         // add product to cart actions here
         for (let product of addProductList) {
-            await page.getByText(product).click();
-            await page.locator('[data-test="add-to-cart"]').click();
-            await page.getByRole("button", { name: 'Go back Back to products' }).click();
+            await inventory.selectProduct(product);
+            await (await cart.addToCart()).goBackToProductPage()
         }
-        const cartBadge = page.locator('[data-test="shopping-cart-badge"]');
-        await expect(cartBadge).toHaveText(String(addProductList.length));
-
-        await cartBadge.click();
-        let allProductNames = await page.locator('[data-test="inventory-item-name"]').allInnerTexts();
+        await inventory.goToShoppingCart()
+        let allProductNames = await cart.getProducts();
         expect(allProductNames, "Count of products in cart is not equal").toHaveLength(addProductList.length)
         expect(allProductNames, "Products in cart are not equal").toEqual(addProductList)
     })
 
     test('Remove a product from the cart', async ({ page }) => {
-        for (const product of addProductList) {
-            await page.getByText(product).click();
-            await page.locator('[data-test="add-to-cart"]').click();
-            await page.getByRole("button", { name: 'Go back Back to products' }).click();
+        const inventory = new Inventory(page)
+        const cart = new Cart(page)
+        // add product to cart actions here
+        for (let product of addProductList) {
+            await inventory.selectProduct(product);
+            expect(page).toHaveURL(pageEndpoints.CART)
+            await (await cart.addToCart()).goBackToProductPage()
         }
-        await page.locator('[data-test="shopping-cart-badge"]').click();
-        let removeButton = "";
-        for (const product of removeProductList) {
-            removeButton = product.replace(/\s+/g, "-");
-            removeButton = removeButton.toLocaleLowerCase();
-            await page.locator(`[data-test="remove-${removeButton}"]`).click();
-        }
-
+        await inventory.removeProduct(removeProductList);
+        await inventory.goToShoppingCart()
         //await page.locator('[data-test="remove-sauce-labs-fleece-jacket"]').click();
-        const totalItem = await page.locator('.inventory_item_name').allInnerTexts();
+        const totalItem = await cart.getProducts();
         console.log(await page.locator('.inventory_item_name').count());
         expect(totalItem).not.toContain(removeProductList[1]);
     })
-    test('Checkout the product from the cart', async ({ page }) => {
-        for (const product of addProductList) {
-            await page.getByText(product).click();
-            await page.locator('[data-test="add-to-cart"]').click();
-            await page.getByRole("button", { name: 'Go back Back to products' }).click();
+    test.only('Checkout the product from the cart', async ({ page }) => {
+        const inventory = new Inventory(page)
+        const cart = new Cart(page)
+        const checkout = new Checkout(page)
+        const checkoutOverview = new CheckoutOverview(page)
+        const order = new Order(page)
+        // add product to cart actions here
+        for (let product of addProductList) {
+            await inventory.selectProduct(product);
+            //confirm the current page is inventory page
+            expect(page).toHaveURL(pageEndpoints.INVENTORY)
+            await (await cart.addToCart()).goBackToProductPage()
         }
-        await page.locator('[data-test="shopping-cart-badge"]').click();
-        await page.getByRole("button", { name: 'Checkout' }).click();
-        await page.getByRole("textbox", { name: 'First Name' }).fill('Tom');
-        await page.getByRole("textbox", { name: 'Last Name' }).fill('Dominic');
-        await page.getByRole("textbox", { name: 'Zip/Postal Code' }).fill('1234');
-        await page.locator('[data-test="continue"]').click();
-        const checkoutItems = await page.locator("div.inventory_item_name").allInnerTexts();
+        await inventory.goToShoppingCart()
+        expect(page).toHaveURL(pageEndpoints.CART)
+        await checkout.goToCheckoutPage()
+        //confirm the current page is checkout step one page
+        expect(page).toHaveURL(pageEndpoints.CHECKOUT)
+        let cusFirstName = checkoutCreds[0].cusFirstName;
+        let cusLastName = checkoutCreds[0].cusLastName
+        let zipCode = checkoutCreds[0].zipCode
+        await checkout.performCheckout(cusFirstName,cusLastName,zipCode)
+        //confirm the current page is checkout step two page
+        expect(page).toHaveURL(pageEndpoints.CHECKOUT_OVERVIEW)
+        //Goto Checkout overview page
+        const checkoutItems = await cart.getProducts();
+
         expect(checkoutItems, "Count of products in cart is not equal").toHaveLength(addProductList.length)
         expect(checkoutItems, "Products in cart are not equal").toEqual(addProductList)
-        expect(page.locator('[data-test="payment-info-label"]')).toBeVisible();
-        expect(page.locator('[data-test="payment-info-value"]').first()).toBeVisible();
-        await page.locator('#finish').click();
-        await expect(page.getByText('Thank you for your order!')).toBeVisible();
-        await page.locator('[data-test="back-to-products"]').click();
+        expect(checkoutOverview.LBL_PAYMENT_INFO).toBeVisible();
+        expect(checkoutOverview.lblPaymentVal).toBeVisible();
+        await checkoutOverview.confirmCheckoutFlow()
+        //Goto Order Confirmation page
+        await expect(order.lblMessage).toBeVisible();
+        await order.backToHome()
     })
 
-    test('Logout Feature', async ({ page }) => {
-        for (const product of addProductList) {
-            await page.getByText(product).click();
-            await page.locator('[data-test="add-to-cart"]').click();
-            await page.getByRole("button", { name: 'Go back Back to products' }).click();
+    test.only('Logout Feature', async ({ page }) => {
+        const inventory = new Inventory(page)
+        const cart = new Cart(page)
+        const checkout = new Checkout(page)
+        const checkoutOverview = new CheckoutOverview(page)
+        const order = new Order(page)
+        // add product to cart actions here
+        for (let product of addProductList) {
+            await inventory.selectProduct(product);
+            //confirm the current page is inventory page
+            await (await cart.addToCart()).goBackToProductPage()
         }
-        await page.locator('[data-test="shopping-cart-badge"]').click();
-        await page.getByRole('button', { name: 'Open Menu' }).click();
-        await page.locator("a#logout_sidebar_link").click();
-        await expect(page.locator('div.login_logo')).toBeVisible();
+        await inventory.goToShoppingCart()
+        expect(page).toHaveURL(pageEndpoints.CART)
+        await checkout.goToCheckoutPage()
+        expect(page).toHaveURL(pageEndpoints.CHECKOUT)
+        await checkout.openMenu();
+        await checkout.logout();
+        await expect(page.locator(LBL_LOGIN_LOGO)).toBeVisible();
     })
 })

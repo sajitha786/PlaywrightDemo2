@@ -9,5 +9,8 @@
     "@types/node": "^25.5.2",
     "typescript": "^6.0.2"
   },
-  "scripts": {}
+  "scripts": {
+    "e2e:dev": "ENV=dev; npx playwright test --project=Inventory",
+    "e2e:qa": "ENV=qa; npx playwright test --project=Inventory"
+  }
 }
